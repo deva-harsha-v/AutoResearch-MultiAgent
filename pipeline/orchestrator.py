@@ -1,0 +1,78 @@
+"""
+Orchestrator — coordinates SearchAgent → SummaryAgent → FactCheckAgent
+and produces the final research report.
+"""
+
+import time
+from dataclasses import dataclass
+from agents.search_agent import SearchAgent
+from agents.summary_agent import SummaryAgent
+from agents.factcheck_agent import FactCheckAgent, FactCheckReport
+from agents.summary_agent import ResearchSummary
+
+
+@dataclass
+class ResearchReport:
+    query: str
+    summary: ResearchSummary
+    fact_check: FactCheckReport
+    elapsed_seconds: float
+
+    def display(self):
+        print("\n" + "="*60)
+        print(f"  RESEARCH REPORT")
+        print(f"  Query: {self.query}")
+        print(f"  Time:  {self.elapsed_seconds:.1f}s")
+        print("="*60)
+
+        print("\n📝 SUMMARY")
+        print("-"*40)
+        print(self.summary.summary)
+
+        print("\n✅ FACT CHECK RESULTS")
+        print("-"*40)
+        for r in self.fact_check.results:
+            icon = "✓" if r.verdict == "VERIFIED" else ("✗" if r.verdict == "DISPUTED" else "?")
+            pct = int(r.confidence * 100)
+            print(f"  {icon} [{pct}%] {r.claim}")
+            print(f"       → {r.reasoning}")
+
+        print(f"\n  Overall confidence: {self.fact_check.overall_confidence*100:.0f}%")
+
+        print("\n🔗 SOURCES")
+        print("-"*40)
+        for i, s in enumerate(self.summary.sources_used, 1):
+            print(f"  [{i}] {s.title}")
+            print(f"      {s.url}")
+
+        print("\n" + "="*60)
+
+
+class Orchestrator:
+    def __init__(self):
+        self.search_agent  = SearchAgent(max_results=5)
+        self.summary_agent = SummaryAgent()
+        self.fact_agent    = FactCheckAgent()
+
+    def run(self, query: str) -> ResearchReport:
+        print(f"\n🚀 Pipeline started for: '{query}'\n")
+        start = time.time()
+
+        # Stage 1 — Search
+        sources = self.search_agent.search(query)
+
+        # Stage 2 — Summarize
+        summary = self.summary_agent.summarize(query, sources)
+
+        # Stage 3 — Fact Check
+        fact_check = self.fact_agent.verify(summary)
+
+        elapsed = round(time.time() - start, 2)
+        print(f"\n✅ Pipeline complete in {elapsed}s")
+
+        return ResearchReport(
+            query=query,
+            summary=summary,
+            fact_check=fact_check,
+            elapsed_seconds=elapsed,
+        )
