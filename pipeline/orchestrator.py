@@ -76,3 +76,28 @@ class Orchestrator:
             fact_check=fact_check,
             elapsed_seconds=elapsed,
         )
+def run_pipeline(query: str):
+    orchestrator = Orchestrator()
+    report = orchestrator.run(query)
+
+    # Convert complex object → simple JSON-friendly output
+    return {
+        "summary": report.summary.summary,
+        "facts": [
+            {
+                "claim": r.claim,
+                "verdict": r.verdict,
+                "confidence": r.confidence,
+                "reasoning": r.reasoning
+            }
+            for r in report.fact_check.results
+        ],
+        "sources": [
+            {
+                "title": s.title,
+                "url": s.url
+            }
+            for s in report.summary.sources_used
+        ],
+        "confidence": report.fact_check.overall_confidence
+    }
