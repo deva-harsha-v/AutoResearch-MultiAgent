@@ -1,6 +1,10 @@
 """
-SummaryAgent — reads search results and uses Gemini API (free)
-to produce a structured research summary + extracted key facts.
+SummaryAgent — reads search results and uses Gemini API to produce
+a structured research summary + extracted key facts.
+
+FIX: Prompt now explicitly forces Gemini to ground every sentence in the
+     actual source snippets, citing [Source N] inline. Generic summaries
+     from training data are blocked by the prompt instruction.
 """
 
 import os
@@ -43,23 +47,53 @@ class SummaryAgent:
         )
 
     def _build_context(self, sources: List[SearchResult]) -> str:
+        """
+        Build a numbered source block that the LLM can cite by index.
+        Including domain and URL helps the model judge source credibility.
+        """
         parts = []
         for i, s in enumerate(sources, 1):
-            parts.append(f"[Source {i}] {s.title}\n{s.snippet}\nURL: {s.url}")
+            parts.append(
+                f"[Source {i}] {s.title}\n"
+                f"Domain: {s.domain}\n"
+                f"Snippet: {s.snippet}\n"
+                f"URL: {s.url}"
+            )
         return "\n\n".join(parts)
 
     def _call_llm(self, query: str, context: str):
-        prompt = f"""You are a research summarizer. Based on the sources below, answer the query.
+        """
+        FIX: The old prompt let Gemini summarise from its own training data.
+        The new prompt:
+        1. Explicitly forbids information not in the sources
+        2. Requires inline [Source N] citations so output is traceable
+        3. Asks for SPECIFIC facts (numbers, names, dates) — not generics
+        4. Each key_fact must quote which source supports it
+        """
+        prompt = f"""You are a research summarizer. Your ONLY job is to synthesize the sources below.
+
+STRICT RULES:
+- Use ONLY information explicitly stated in the numbered sources below.
+- Do NOT use your training knowledge. Do NOT add any information not present in the sources.
+- Every sentence in your summary must be traceable to a specific source.
+- Key facts must be specific (include numbers, names, dates, percentages where available).
+- If a source contains no relevant information, skip it.
 
 QUERY: {query}
 
 SOURCES:
 {context}
 
-Respond ONLY with a JSON object (no markdown, no backticks):
+Respond ONLY with a JSON object (no markdown, no backticks, no extra text):
 {{
-  "summary": "3-4 sentence research summary",
-  "key_facts": ["fact 1", "fact 2", "fact 3", "fact 4", "fact 5"]
+  "summary": "3-4 sentence summary using ONLY the source content above. Cite sources inline as [Source 1], [Source 2], etc.",
+  "key_facts": [
+    "Specific fact from Source N: ...",
+    "Specific fact from Source N: ...",
+    "Specific fact from Source N: ...",
+    "Specific fact from Source N: ...",
+    "Specific fact from Source N: ..."
+  ]
 }}"""
 
         try:
@@ -69,7 +103,10 @@ Respond ONLY with a JSON object (no markdown, no backticks):
             )
             raw = response.text.strip().replace("```json", "").replace("```", "").strip()
             parsed = json.loads(raw)
-            return parsed.get("summary", ""), parsed.get("key_facts", [])
+            summary = parsed.get("summary", "")
+            facts = parsed.get("key_facts", [])
+            return summary, facts
+
         except json.JSONDecodeError:
             self.log("JSON parse failed, using raw text as summary")
             return response.text.strip(), []

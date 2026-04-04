@@ -88,14 +88,17 @@ def run_pipeline(query: str):
                 "claim": r.claim,
                 "verdict": r.verdict,
                 "confidence": r.confidence,
-                "reasoning": r.reasoning
+                "reasoning": r.reasoning,
+                "source_ref": getattr(r, "source_ref", ""),
             }
             for r in report.fact_check.results
         ],
         "sources": [
             {
                 "title": s.title,
-                "url": s.url
+                "url": s.url,
+                "domain": getattr(s, "domain", ""),
+                "relevance_score": getattr(s, "relevance_score", 0.0),
             }
             for s in report.summary.sources_used
         ],
