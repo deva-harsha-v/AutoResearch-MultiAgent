@@ -2,3 +2,4 @@ flask
 duckduckgo-search
 requests
 google-genai
+flask-cors

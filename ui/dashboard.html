@@ -369,7 +369,7 @@ function renderHistory(){
 async function callClaude(messages, tools, max_tokens=1200){
   const body={model:'claude-sonnet-4-20250514',max_tokens,messages};
   if(tools) body.tools=tools;
-  const r=await fetch('https://web-production-541ad.up.railway.app/',{
+  const r=await fetch('https://autoresearch-multiagent.up.railway.app/run',{
     method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
   });
   return r.json();

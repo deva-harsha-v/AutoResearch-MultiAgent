@@ -1,8 +1,11 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from pipeline.orchestrator import run_pipeline
 import os
 
 app = Flask(__name__)
+CORS(app)  # ← add this line
+
 
 @app.route("/")
 def home():
